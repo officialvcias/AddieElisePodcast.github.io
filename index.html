@@ -4,105 +4,288 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Podcast Listener</title>
+    <!-- Firebase SDK (compat mode for simple HTML/JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            color: #333;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #2a0e4a 0%, #1a0633 100%);
+            color: #e0d4ff;
             margin: 0;
             padding: 0;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(106, 27, 154, 0.08) 2%, transparent 2%),
+                radial-gradient(circle at 75% 75%, rgba(106, 27, 154, 0.06) 2%, transparent 2%);
+            background-size: 60px 60px;
+            position: relative;
         }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(106, 27, 154, 0.03) 10px,
+                rgba(106, 27, 154, 0.03) 20px
+            );
+            pointer-events: none;
+            z-index: -1;
+        }
+
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 30px 20px;
+            position: relative;
+            z-index: 1;
         }
+
         header {
-            background-color: #4A148C; /* Slightly dark purple */
+            background: linear-gradient(to bottom, #4A148C, #3c1073);
             color: white;
-            padding: 20px;
+            padding: 50px 20px 40px;
             text-align: center;
+            border-radius: 0 0 24px 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
         }
-        #login {
-            text-align: center;
-            margin: 20px 0;
+        header::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+            animation: pulse 12s infinite alternate;
         }
-        #content {
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.4; }
+            100% { transform: scale(1.4); opacity: 0.1; }
+        }
+
+        header h1 { margin: 0; font-size: 3rem; text-shadow: 0 4px 12px rgba(0,0,0,0.6); letter-spacing: 1px; }
+        header p { margin: 8px 0 0; opacity: 0.9; font-size: 1.2rem; }
+
+        .admin-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(45deg, #7B1FA2, #9C27B0);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 6px 20px rgba(156, 39, 176, 0.4);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        .admin-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(156, 39, 176, 0.6);
+            background: linear-gradient(45deg, #9C27B0, #AB47BC);
+        }
+
+        .modal {
             display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(26, 6, 51, 0.85);
+            backdrop-filter: blur(6px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
         }
+        .modal-content {
+            background: linear-gradient(to bottom, #311b52, #251340);
+            padding: 40px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+            border: 1px solid #5e35b1;
+            color: #e0d4ff;
+        }
+
         input[type="text"], input[type="password"], input[type="url"] {
             width: 100%;
-            padding: 10px;
-            margin: 10px 0;
+            padding: 14px;
+            margin: 14px 0;
             box-sizing: border-box;
-        }
-        button {
-            background-color: #4A148C;
+            border: 1px solid #6a1b9a;
+            border-radius: 8px;
+            background: #1e0f38;
             color: white;
-            padding: 10px 20px;
+            font-size: 1rem;
+        }
+        input:focus {
+            outline: none;
+            border-color: #ab47bc;
+            box-shadow: 0 0 0 3px rgba(171,71,188,0.3);
+        }
+
+        button {
+            background: linear-gradient(45deg, #6A1B9A, #7B1FA2);
+            color: white;
+            padding: 14px 28px;
             border: none;
+            border-radius: 50px;
             cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
         button:hover {
-            background-color: #6A1B9A;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(123, 31, 162, 0.5);
+            background: linear-gradient(45deg, #7B1FA2, #9C27B0);
         }
+
         .video-list {
-            margin-top: 20px;
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 30px;
         }
         .video-item {
-            margin-bottom: 20px;
-            text-align: center;
+            background: rgba(40, 20, 70, 0.5);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(106, 27, 154, 0.3);
+            backdrop-filter: blur(6px);
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+        .video-item:hover {
+            transform: translateY(-8px);
+            border-color: #ab47bc;
+            box-shadow: 0 16px 40px rgba(106, 27, 154, 0.35);
         }
         iframe {
             width: 100%;
-            height: 315px;
-            max-width: 560px;
+            height: 200px;
+            border-radius: 12px;
+            border: none;
         }
+        .remove-btn {
+            display: none;
+            background: linear-gradient(45deg, #c62828, #d32f2f);
+            width: 100%;
+            margin-top: 16px;
+            padding: 10px;
+            border-radius: 50px;
+            font-weight: bold;
+        }
+        .remove-btn:hover {
+            background: linear-gradient(45deg, #d32f2f, #e53935);
+        }
+        .logged-in .remove-btn {
+            display: block;
+        }
+
+        #add-section {
+            display: none;
+            margin: 40px 0;
+            padding: 30px;
+            background: rgba(49, 27, 82, 0.4);
+            border-radius: 16px;
+            border: 1px solid rgba(106, 27, 154, 0.4);
+            backdrop-filter: blur(8px);
+        }
+        .logged-in #add-section {
+            display: block;
+        }
+
+        h2, h3 { color: #d1c4e9; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
+
     <header>
         <h1>My Podcast Listener</h1>
+        <p>Immerse yourself in the episodes</p>
     </header>
+
+    <button class="admin-btn" onclick="openLoginModal()">Admin • Add Episode</button>
+
     <div class="container">
-        <div id="login">
-            <h2>Login</h2>
-            <input type="text" id="username" placeholder="Username">
-            <input type="password" id="password" placeholder="Password">
-            <button onclick="login()">Login</button>
-            <p id="error" style="color: red;"></p>
-        </div>
-        <div id="content">
-            <h2>Add a YouTube Video</h2>
-            <input type="url" id="youtube-url" placeholder="Paste YouTube link here">
-            <button onclick="addVideo()">Add Video</button>
-            <div class="video-list" id="video-list">
-                <h3>Added Podcasts</h3>
-                <!-- Videos will be added here -->
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()" style="color:#d1c4e9; font-size:36px; float:right; cursor:pointer;">×</span>
+                <h2 style="margin-top:0;">Admin Access</h2>
+                <input type="text" id="username" placeholder="Username">
+                <input type="password" id="password" placeholder="Password">
+                <button onclick="login()" style="margin-top:20px; width:100%;">Login</button>
+                <p id="error" style="color: #ff8a80; margin-top: 16px; min-height:1.4em;"></p>
             </div>
+        </div>
+
+        <div id="add-section">
+            <h2>Add New Episode</h2>
+            <input type="url" id="youtube-url" placeholder="Paste YouTube link here (youtu.be or youtube.com/watch?...)" />
+            <button onclick="addVideo()" style="margin-top:16px;">Add Episode</button>
+        </div>
+
+        <div class="video-list" id="video-list">
+            <!-- Episodes appear here as cards -->
         </div>
     </div>
 
     <script>
+        // === Replace this with YOUR Firebase config from the console ===
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         const validUsers = [
             { username: 'Addie', password: 'Fred' },
             { username: 'Elise', password: 'Fred' }
         ];
 
+        let isLoggedIn = false;
+
+        function openLoginModal() {
+            document.getElementById('loginModal').style.display = 'flex';
+            document.getElementById('error').textContent = '';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        function closeModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
         function login() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
             const error = document.getElementById('error');
 
             const user = validUsers.find(u => u.username === username && u.password === password);
+
             if (user) {
-                document.getElementById('login').style.display = 'none';
-                document.getElementById('content').style.display = 'block';
+                isLoggedIn = true;
+                document.body.classList.add('logged-in');
+                closeModal();
                 loadVideos();
             } else {
-                error.textContent = 'Invalid username or password.';
+                error.textContent = 'Invalid credentials.';
             }
         }
 
@@ -112,31 +295,83 @@
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        function addVideo() {
-            const url = document.getElementById('youtube-url').value;
+        async function addVideo() {
+            if (!isLoggedIn) return;
+
+            const url = document.getElementById('youtube-url').value.trim();
             const videoId = getVideoId(url);
-            if (videoId) {
-                let videos = JSON.parse(localStorage.getItem('podcasts')) || [];
-                videos.push(videoId);
-                localStorage.setItem('podcasts', JSON.stringify(videos));
-                document.getElementById('youtube-url').value = '';
-                loadVideos();
-            } else {
-                alert('Invalid YouTube URL.');
+
+            if (!videoId) {
+                alert('Please enter a valid YouTube URL.');
+                return;
+            }
+
+            try {
+                // Check if already exists (optional, to avoid duplicates)
+                const querySnapshot = await db.collection('podcasts').where('videoId', '==', videoId).get();
+                if (querySnapshot.empty) {
+                    await db.collection('podcasts').add({
+                        videoId: videoId,
+                        addedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    document.getElementById('youtube-url').value = '';
+                    loadVideos();
+                } else {
+                    alert('This video is already added.');
+                }
+            } catch (e) {
+                console.error("Error adding video: ", e);
+                alert('Error adding video. Check console.');
             }
         }
 
-        function loadVideos() {
-            const videoList = document.getElementById('video-list');
-            videoList.innerHTML = '<h3>Added Podcasts</h3>';
-            const videos = JSON.parse(localStorage.getItem('podcasts')) || [];
-            videos.forEach(videoId => {
-                const div = document.createElement('div');
-                div.className = 'video-item';
-                div.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
-                videoList.appendChild(div);
-            });
+        async function removeVideo(docId) {
+            if (!isLoggedIn) return;
+            if (!confirm('Remove this episode?')) return;
+
+            try {
+                await db.collection('podcasts').doc(docId).delete();
+                loadVideos();
+            } catch (e) {
+                console.error("Error removing video: ", e);
+                alert('Error removing video.');
+            }
         }
+
+        async function loadVideos() {
+            const videoList = document.getElementById('video-list');
+            videoList.innerHTML = '';
+
+            try {
+                const querySnapshot = await db.collection('podcasts')
+                    .orderBy('addedAt', 'desc')  // newest first
+                    .get();
+
+                if (querySnapshot.empty) {
+                    videoList.innerHTML = '<p style="text-align:center; color:#b39ddb; font-size:1.2rem; padding:40px 0;">No episodes added yet.</p>';
+                    return;
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const videoId = data.videoId;
+
+                    const div = document.createElement('div');
+                    div.className = 'video-item';
+                    div.innerHTML = `
+                        <iframe src="https://www.youtube.com/embed/${videoId}" allowfullscreen></iframe>
+                        <button class="remove-btn" onclick="removeVideo('${doc.id}')">Remove Episode</button>
+                    `;
+                    videoList.appendChild(div);
+                });
+            } catch (e) {
+                console.error("Error loading videos: ", e);
+                videoList.innerHTML = '<p style="color:#ff8a80; text-align:center;">Error loading episodes. Check console.</p>';
+            }
+        }
+
+        // Load videos on page load (public view – no login needed to listen)
+        window.onload = loadVideos;
     </script>
 </body>
 </html>
